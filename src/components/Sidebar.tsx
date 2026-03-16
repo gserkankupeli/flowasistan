@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     MessageSquare,
     Phone,
     Users,
+    Calendar,
     BarChart3,
     Settings,
     Bell,
@@ -20,12 +22,14 @@ const sidebarItems = [
     { icon: MessageSquare, label: 'Chatbot', href: '/chatbot' },
     { icon: Phone, label: 'Sesli Asistan', href: '/voice-agent' },
     { icon: Users, label: 'Müşteriler', href: '/customers' },
+    { icon: Calendar, label: 'Takvim', href: '/calendar' },
     { icon: BarChart3, label: 'Raporlar', href: '/reports' },
     { icon: Settings, label: 'Ayarlar', href: '/settings' },
 ];
 
 export function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
+    const { user, signOut } = useAuth();
 
     return (
         <motion.div
@@ -45,17 +49,17 @@ export function Sidebar() {
                 {/* Logo Section */}
                 <div className="flex h-20 items-center justify-center border-b border-gray-100/50 bg-gradient-to-b from-white to-gray-50/50">
                     {collapsed ? (
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                            <span className="text-white font-bold text-xl">F</span>
+                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
+                            <img src="/logo.svg" alt="FlowAsistan Logo" className="h-6 w-6 object-contain" />
                         </div>
                     ) : (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-3"
                         >
-                            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-                                <span className="text-white font-bold">FA</span>
+                            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-md shadow-blue-500/20">
+                                <img src="/logo.svg" alt="FlowAsistan Logo" className="h-6 w-6 object-contain" />
                             </div>
                             <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
                                 FlowAsistan
@@ -114,8 +118,24 @@ export function Sidebar() {
                 </nav>
             </div>
 
-            {/* Footer Section */}
+            {/* Footer Section - With User Info */}
             <div className="border-t border-gray-100 p-4 bg-gray-50/50">
+                {!collapsed && user && (
+                    <div className="mb-4 flex items-center gap-3 px-2">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+                            {user.email?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium text-gray-900 truncate">
+                                {user.user_metadata?.full_name || 'Kullanıcı'}
+                            </span>
+                            <span className="text-xs text-gray-500 truncate" title={user.email}>
+                                {user.email}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
                 <NavLink
                     to="/notifications"
                     className={({ isActive }) =>
@@ -129,7 +149,10 @@ export function Sidebar() {
                     {!collapsed && <span>Bildirimler</span>}
                 </NavLink>
 
-                <button className="mt-2 w-full group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-600">
+                <button
+                    onClick={signOut}
+                    className="mt-2 w-full group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-600"
+                >
                     <LogOut className={cn("transition-transform duration-300 group-hover:-translate-x-1", collapsed ? "h-6 w-6 mx-auto" : "h-5 w-5")} />
                     {!collapsed && <span>Çıkış Yap</span>}
                 </button>

@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Search, Filter, MoreVertical, Mail, Phone, Calendar, Clock, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, MoreVertical, Mail, Phone, Calendar, Clock, MessageSquare, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { cn } from '../../lib/utils';
 import type { Database } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 // Mock data
 type Customer = Database['public']['Tables']['customers']['Row'];
@@ -49,6 +50,69 @@ const mockCustomers: Customer[] = [
 
 export default function Customers() {
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [realCustomers, setRealCustomers] = useState<Customer[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchCustomers();
+
+        const channel = supabase
+            .channel('customers_list')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'customers' },
+                () => {
+                    fetchCustomers();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    const fetchCustomers = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            if (data) {
+                setRealCustomers(data as Customer[]);
+            }
+        } catch (error) {
+            console.error('Error fetching customers:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteCustomer = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation(); // prevent row click from opening details
+
+        if (id.startsWith('c')) {
+            alert("Örnek müşteriler silinemez.");
+            return;
+        }
+
+        if (window.confirm("Bu müşteriyi silmek istediğinize emin misiniz? Tüm konuşma geçmişi de silinecek.")) {
+            try {
+                const { error } = await supabase.from('customers').delete().eq('id', id);
+                if (error) throw error;
+                fetchCustomers();
+            } catch (err) {
+                console.error("Müşteri silinirken hata oluştu:", err);
+                alert("Silme işlemi başarısız.");
+            }
+        }
+    };
+
+    // Combine mock customers and real customers, ensuring no duplicates by ID just in case
+    const allCustomers = [...realCustomers, ...mockCustomers];
 
     return (
         <div className="flex h-[calc(100vh-8rem)] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -86,45 +150,66 @@ export default function Customers() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {mockCustomers.map(customer => (
-                                <tr
-                                    key={customer.id}
-                                    onClick={() => setSelectedCustomer(customer)}
-                                    className={cn(
-                                        "hover:bg-gray-50 cursor-pointer transition-colors",
-                                        selectedCustomer?.id === customer.id ? "bg-blue-50 hover:bg-blue-50" : ""
-                                    )}
-                                >
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-xs">
-                                                {customer.first_name?.[0]}{customer.last_name?.[0]}
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-gray-900">{customer.first_name} {customer.last_name}</div>
-                                                {selectedCustomer && <div className="text-xs text-gray-500">{customer.phone}</div>}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className={cn("px-4 py-3", selectedCustomer ? "hidden" : "")}>
-                                        <div className="text-gray-900">{customer.phone}</div>
-                                        <div className="text-gray-500 text-xs">{customer.email}</div>
-                                    </td>
-                                    <td className={cn("px-4 py-3", selectedCustomer ? "hidden" : "")}>
-                                        <Badge variant={customer.status === 'active' ? 'success' : customer.status === 'completed' ? 'secondary' : 'warning'}>
-                                            {customer.status}
-                                        </Badge>
-                                    </td>
-                                    <td className={cn("px-4 py-3 text-gray-500", selectedCustomer ? "hidden" : "")}>
-                                        {new Date(customer.last_interaction_date || '').toLocaleDateString()}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </td>
+                            {loading && realCustomers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
                                 </tr>
-                            ))}
+                            ) : allCustomers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Müşteri bulunamadı.</td>
+                                </tr>
+                            ) : (
+                                allCustomers.map(customer => (
+                                    <tr
+                                        key={customer.id}
+                                        onClick={() => setSelectedCustomer(customer)}
+                                        className={cn(
+                                            "hover:bg-gray-50 cursor-pointer transition-colors",
+                                            selectedCustomer?.id === customer.id ? "bg-blue-50 hover:bg-blue-50" : ""
+                                        )}
+                                    >
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-medium text-xs">
+                                                    {customer.first_name?.[0] || 'M'}{customer.last_name?.[0] || ''}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900 text-[13px]">{customer.first_name || 'İsimsiz'} {customer.last_name || ''}</div>
+                                                    {selectedCustomer && <div className="text-xs font-medium text-gray-400 mt-0.5">{customer.phone}</div>}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className={cn("px-4 py-3", selectedCustomer ? "hidden" : "")}>
+                                            <div className="text-gray-900 font-medium text-[13px]">{customer.phone}</div>
+                                            <div className="text-gray-400 font-medium text-xs">{customer.email || 'Email yok'}</div>
+                                        </td>
+                                        <td className={cn("px-4 py-3", selectedCustomer ? "hidden" : "")}>
+                                            <Badge variant={customer.status === 'active' ? 'success' : customer.status === 'completed' ? 'secondary' : 'warning'}>
+                                                {customer.status || 'active'}
+                                            </Badge>
+                                        </td>
+                                        <td className={cn("px-4 py-3 text-gray-500 font-medium text-[13px]", selectedCustomer ? "hidden" : "")}>
+                                            {customer.last_interaction_date ? new Date(customer.last_interaction_date).toLocaleDateString('tr-TR') : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-400 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={(e) => handleDeleteCustomer(e, customer.id)}
+                                                    title="Sil"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

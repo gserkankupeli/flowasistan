@@ -401,6 +401,35 @@ export interface Database {
                     created_at?: string
                 }
             }
+            call_analytics: {
+                Row: {
+                    id: string
+                    created_at: string
+                    customer_phone: string | null
+                    summary: string | null
+                    category: string | null
+                    duration: number | null
+                    recording_url: string | null
+                }
+                Insert: {
+                    id?: string
+                    created_at?: string
+                    customer_phone?: string | null
+                    summary?: string | null
+                    category?: string | null
+                    duration?: number | null
+                    recording_url?: string | null
+                }
+                Update: {
+                    id?: string
+                    created_at?: string
+                    customer_phone?: string | null
+                    summary?: string | null
+                    category?: string | null
+                    duration?: number | null
+                    recording_url?: string | null
+                }
+            }
         }
     }
 }

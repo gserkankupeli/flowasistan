@@ -13,8 +13,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
             ref={ref}
             whileHover={hoverEffect ? { y: -5, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)" } : {}}
             className={cn(
-                'relative overflow-hidden rounded-xl border border-gray-200/60 bg-white/70 backdrop-blur-xl text-gray-950 shadow-sm transition-all',
-                hoverEffect ? "hover:border-blue-500/30" : "",
+                'relative overflow-hidden rounded-[24px] border border-gray-100 bg-white text-gray-950 shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all duration-300',
+                hoverEffect ? "hover:border-gray-200 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]" : "",
                 className
             )}
             {...props}
