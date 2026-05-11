@@ -179,6 +179,48 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.chatbot_conversations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_conversations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 
+-- call_analytics table (used by VoiceAgent page)
+CREATE TABLE public.call_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    customer_phone TEXT,
+    summary TEXT,
+    category TEXT,
+    duration INTEGER,
+    recording_url TEXT
+);
+
+ALTER TABLE public.call_analytics ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for all users" ON public.call_analytics FOR SELECT USING (true);
+CREATE POLICY "Enable insert access for all users" ON public.call_analytics FOR INSERT WITH CHECK (true);
+CREATE POLICY "Enable update access for all users" ON public.call_analytics FOR UPDATE USING (true);
+
+-- urgent_callbacks view (used by Overview page)
+-- Shows chatbot conversations that require urgent human callback
+CREATE OR REPLACE VIEW public.urgent_callbacks AS
+SELECT
+    cc.id AS conversation_id,
+    cc.customer_id,
+    c.first_name,
+    c.last_name,
+    c.phone,
+    NULL::TEXT AS telegram_id,
+    cc.summary AS konusma_ozeti,
+    cat.name AS durum,
+    cat.color AS renk_kodu,
+    cc.last_message_at AS son_mesaj_tarihi
+FROM public.chatbot_conversations cc
+LEFT JOIN public.customers c ON cc.customer_id = c.id
+LEFT JOIN public.categories cat ON cc.category_id = cat.id
+WHERE cc.status = 'active'
+  AND cat.name = 'Geri Arama Talebi';
+
+-- Add DELETE policies for tables that support deletion from the UI
+CREATE POLICY "Enable delete access for all users" ON public.customers FOR DELETE USING (true);
+CREATE POLICY "Enable delete access for all users" ON public.chatbot_conversations FOR DELETE USING (true);
+CREATE POLICY "Enable delete access for all users" ON public.voice_conversations FOR DELETE USING (true);
+CREATE POLICY "Enable delete access for all users" ON public.call_analytics FOR DELETE USING (true);
+
 -- Seed Categories
 INSERT INTO public.categories (name, description, color, sort_order) VALUES
 ('Başarılı/Tamamlandı', 'Randevu alındı, satış gerçekleşti, sorun çözüldü', '#10B981', 1),

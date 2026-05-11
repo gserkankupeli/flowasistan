@@ -131,10 +131,7 @@ export default function Chatbot() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'chatbot_conversations' },
-                async (payload) => {
-                    console.log('Realtime update:', payload);
-                    // For simplicity, re-fetch list to get joined data easily.
-                    // Optimistic updates are harder with joins without manual handling.
+                async () => {
                     await fetchConversations();
                 }
             )

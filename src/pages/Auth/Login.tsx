@@ -80,7 +80,7 @@ export default function Login() {
                                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
                                     Şifre
                                 </label>
-                                <Link to="/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
+                                <Link to="/auth/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
                                     Şifremi Unuttum?
                                 </Link>
                             </div>

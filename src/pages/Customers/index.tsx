@@ -6,51 +6,12 @@ import { cn } from '../../lib/utils';
 import type { Database } from '../../types';
 import { supabase } from '../../lib/supabase';
 
-// Mock data
 type Customer = Database['public']['Tables']['customers']['Row'];
-
-const mockCustomers: Customer[] = [
-    {
-        id: 'c1',
-        first_name: 'Ahmet',
-        last_name: 'Yılmaz',
-        phone: '+905551234567',
-        email: 'ahmet@example.com',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        last_interaction_date: new Date().toISOString(),
-        total_interactions: 15,
-        status: 'active'
-    },
-    {
-        id: 'c2',
-        first_name: 'Ayşe',
-        last_name: 'Demir',
-        phone: '+905329876543',
-        email: 'ayse@example.com',
-        created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-        updated_at: new Date().toISOString(),
-        last_interaction_date: new Date(Date.now() - 86400000).toISOString(),
-        total_interactions: 8,
-        status: 'completed'
-    },
-    {
-        id: 'c3',
-        first_name: 'Mehmet',
-        last_name: 'Kaya',
-        phone: '+905321112233',
-        email: null,
-        created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-        updated_at: new Date().toISOString(),
-        last_interaction_date: new Date(Date.now() - 86400000 * 2).toISOString(),
-        total_interactions: 3,
-        status: 'inactive'
-    }
-];
 
 export default function Customers() {
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-    const [realCustomers, setRealCustomers] = useState<Customer[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -82,7 +43,7 @@ export default function Customers() {
 
             if (error) throw error;
             if (data) {
-                setRealCustomers(data as Customer[]);
+                setCustomers(data as Customer[]);
             }
         } catch (error) {
             console.error('Error fetching customers:', error);
@@ -92,17 +53,13 @@ export default function Customers() {
     };
 
     const handleDeleteCustomer = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation(); // prevent row click from opening details
-
-        if (id.startsWith('c')) {
-            alert("Örnek müşteriler silinemez.");
-            return;
-        }
+        e.stopPropagation();
 
         if (window.confirm("Bu müşteriyi silmek istediğinize emin misiniz? Tüm konuşma geçmişi de silinecek.")) {
             try {
                 const { error } = await supabase.from('customers').delete().eq('id', id);
                 if (error) throw error;
+                if (selectedCustomer?.id === id) setSelectedCustomer(null);
                 fetchCustomers();
             } catch (err) {
                 console.error("Müşteri silinirken hata oluştu:", err);
@@ -111,8 +68,16 @@ export default function Customers() {
         }
     };
 
-    // Combine mock customers and real customers, ensuring no duplicates by ID just in case
-    const allCustomers = [...realCustomers, ...mockCustomers];
+    const filteredCustomers = customers.filter(c => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            c.first_name?.toLowerCase().includes(q) ||
+            c.last_name?.toLowerCase().includes(q) ||
+            c.phone?.toLowerCase().includes(q) ||
+            c.email?.toLowerCase().includes(q)
+        );
+    });
 
     return (
         <div className="flex h-[calc(100vh-8rem)] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -130,6 +95,8 @@ export default function Customers() {
                                 type="text"
                                 placeholder="İsim, telefon veya email ara..."
                                 className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
                         <Button variant="outline" size="icon" className="shrink-0">
@@ -150,16 +117,18 @@ export default function Customers() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {loading && realCustomers.length === 0 ? (
+                            {loading ? (
                                 <tr>
                                     <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
                                 </tr>
-                            ) : allCustomers.length === 0 ? (
+                            ) : filteredCustomers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Müşteri bulunamadı.</td>
+                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                        {searchQuery ? 'Arama sonucu bulunamadı.' : 'Henüz müşteri yok.'}
+                                    </td>
                                 </tr>
                             ) : (
-                                allCustomers.map(customer => (
+                                filteredCustomers.map(customer => (
                                     <tr
                                         key={customer.id}
                                         onClick={() => setSelectedCustomer(customer)}

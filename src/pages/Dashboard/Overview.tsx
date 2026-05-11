@@ -95,9 +95,7 @@ export default function Overview() {
                     schema: 'public',
                     table: 'chatbot_conversations'
                 },
-                (payload) => {
-                    console.log('New interaction received!', payload);
-                    // Refresh data on new insert (or ideally prepend to list if we fetch the full relation)
+                () => {
                     fetchDashboardData();
                 }
             )
@@ -214,10 +212,9 @@ export default function Overview() {
 
     const markAsCompleted = async (conversationId: string) => {
         try {
-            const updatePayload: Record<string, string> = { status: 'completed' };
             const { error } = await supabase
                 .from('chatbot_conversations')
-                .update(updatePayload as never)
+                .update({ status: 'completed' as const })
                 .eq('id', conversationId);
 
             if (error) throw error;

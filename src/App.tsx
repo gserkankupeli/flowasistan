@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AuthLayout from './layouts/AuthLayout';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ForgotPassword from './pages/Auth/ForgotPassword';
 
 import DashboardLayout from './layouts/DashboardLayout';
 import Overview from './pages/Dashboard/Overview';
@@ -23,6 +24,7 @@ function App() {
           <Route path="/auth" element={<AuthLayout />}>
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
           </Route>
 
           {/* Protected Dashboard Routes */}

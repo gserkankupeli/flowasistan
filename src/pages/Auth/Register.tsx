@@ -44,6 +44,8 @@ export default function Register() {
 
         if (authData.user) {
             navigate('/');
+        } else {
+            setLoading(false);
         }
     };
 
