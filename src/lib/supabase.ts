@@ -1,14 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { isDemo } from './config';
+import { demoClient } from './demo/client';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase URL or Anon Key is missing. Please check your .env file.');
-}
-
-export const supabase = createClient<Database>(
-    supabaseUrl || '',
-    supabaseAnonKey || ''
-);
+// In demo mode no real client is created; pages talk to the in-browser demo client instead.
+export const supabase: SupabaseClient = isDemo
+    ? (demoClient as unknown as SupabaseClient)
+    : createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);

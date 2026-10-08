@@ -1,73 +1,73 @@
-# React + TypeScript + Vite
+# FlowAsistan
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The CRM panel for chatbots and voice agents. FlowAsistan collects the conversations your
+WhatsApp, Instagram, Telegram and web chatbots and your voice agent have with customers,
+shows each one with an AI summary and an outcome category, and surfaces the ones that need
+a person.
 
-Currently, two official plugins are available:
+Chatbot ve sesli asistan görüşmeleri için CRM paneli. Arayüz Türkçe ve İngilizce.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What is in the panel
 
-## React Compiler
+| Page | What it does |
+|---|---|
+| Overview | KPIs, live feed of the latest conversations, 7-day volume, queue of customers waiting for a callback |
+| Chatbot | Inbox grouped by customer with message history and AI summary; analytics per channel |
+| Voice Agent | Call log with summary, transcript and recording; call analytics |
+| Customers | Customer list, search, new customer, interaction history across chat and calls |
+| Calendar | Appointments booked by the bots and the team; create and cancel |
+| Reports | Channel, category and daily breakdowns for 7 / 14 / 30 days; CSV export |
+| Notifications | Urgent, success, warning and system notifications; mark read, delete |
+| Settings | Language, conversation categories, platform connections |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+React 19, TypeScript, Vite, Tailwind CSS, Recharts, Framer Motion, Supabase (Postgres, Auth,
+Realtime). Records are written to Supabase by n8n flows (chatbot and voice agent webhooks);
+the panel reads and updates them.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Two modes
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Demo mode** runs the whole panel in the browser on fictional data (`src/lib/demo`): no login,
+no Supabase, no external API. It is what the public site serves. The panel lives under `/demo`.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+**Live mode** uses Supabase with email and password login. The panel lives under `/app`.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The mode is decided at build time in `src/lib/config.ts`:
+
+- `VITE_DEMO_MODE=true`, or missing Supabase variables: demo mode
+- Supabase variables set and `VITE_DEMO_MODE` not `true`: live mode
+
+`.env.production` sets `VITE_DEMO_MODE=true`, so every production build is a demo unless the
+hosting environment overrides it.
+
+## Run locally
+
+```bash
+npm install
+cp .env.example .env    # fill in the Supabase values for live mode, or leave them out for demo
+npm run dev             # http://localhost:3005
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+To see the demo locally while a `.env` with Supabase values exists:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+VITE_DEMO_MODE=true npm run dev
 ```
+
+## Deploy (Vercel)
+
+Import the repository in Vercel. `vercel.json` already sets the build command, the output
+directory and the single-page-app rewrite. Do not add the Supabase variables to the Vercel
+project: the public deployment is meant to be the demo.
+
+### Before serving live mode publicly
+
+The policies in `supabase/schema.sql` are development policies (`USING (true)`): anyone holding
+the anon key can read, change and delete every row. The anon key is embedded in the client
+bundle, so a public live-mode deployment would expose customer data. Restrict the policies to
+signed-in users (and to the owning business) first.
+
+## Database
+
+`supabase/schema.sql` creates the tables, the `urgent_callbacks` view and the seed categories.

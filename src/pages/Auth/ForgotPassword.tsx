@@ -5,12 +5,14 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader } from '../../components/ui/card';
 import { Loader2, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useLang } from '../../lib/i18n';
 
 export default function ForgotPassword() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [email, setEmail] = useState('');
+    const { t } = useLang();
 
     const handleReset = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,7 +26,7 @@ export default function ForgotPassword() {
         setLoading(false);
 
         if (error) {
-            setError('Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.');
+            setError(t('Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.', 'The reset email could not be sent. Please try again.'));
         } else {
             setSuccess(true);
         }
@@ -38,10 +40,10 @@ export default function ForgotPassword() {
         >
             <div className="text-center lg:text-left">
                 <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Şifremi Unuttum
+                    {t('Şifremi Unuttum', 'Forgot Password')}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                    E-posta adresinizi girin, şifre sıfırlama bağlantısı gönderelim.
+                    {t('E-posta adresinizi girin, şifre sıfırlama bağlantısı gönderelim.', 'Enter your email and we will send you a reset link.')}
                 </p>
             </div>
 
@@ -56,7 +58,7 @@ export default function ForgotPassword() {
                     {success && (
                         <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm flex items-center gap-2 mb-4">
                             <CheckCircle className="h-4 w-4" />
-                            Şifre sıfırlama e-postası gönderildi. Lütfen gelen kutunuzu kontrol edin.
+                            {t('Şifre sıfırlama e-postası gönderildi. Lütfen gelen kutunuzu kontrol edin.', 'Reset email sent. Please check your inbox.')}
                         </div>
                     )}
                 </CardHeader>
@@ -65,7 +67,7 @@ export default function ForgotPassword() {
                         <form onSubmit={handleReset} className="space-y-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium leading-none" htmlFor="email">
-                                    E-posta Adresi
+                                    {t('E-posta Adresi', 'Email Address')}
                                 </label>
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -84,10 +86,10 @@ export default function ForgotPassword() {
                                 {loading ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Gönderiliyor...
+                                        {t('Gönderiliyor...', 'Sending...')}
                                     </>
                                 ) : (
-                                    'Sıfırlama Bağlantısı Gönder'
+                                    t('Sıfırlama Bağlantısı Gönder', 'Send Reset Link')
                                 )}
                             </Button>
                         </form>
@@ -95,7 +97,7 @@ export default function ForgotPassword() {
 
                     <div className="mt-6 text-center text-sm">
                         <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
-                            Giriş sayfasına dön
+                            {t('Giriş sayfasına dön', 'Back to sign in')}
                         </Link>
                     </div>
                 </CardContent>

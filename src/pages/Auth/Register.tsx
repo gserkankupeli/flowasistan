@@ -5,9 +5,12 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader } from '../../components/ui/card';
 import { Loader2, Mail, Lock, AlertCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { APP_BASE } from '../../lib/config';
+import { useLang } from '../../lib/i18n';
 
 export default function Register() {
     const navigate = useNavigate();
+    const { t } = useLang();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -43,7 +46,7 @@ export default function Register() {
         }
 
         if (authData.user) {
-            navigate('/');
+            navigate(APP_BASE);
         } else {
             setLoading(false);
         }
@@ -57,10 +60,10 @@ export default function Register() {
         >
             <div className="text-center lg:text-left">
                 <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Hesap Oluşturun
+                    {t('Hesap Oluşturun', 'Create an Account')}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                    FlowAsistan ile müşteri süreçlerinizi yönetmeye başlayın.
+                    {t('FlowAsistan ile müşteri süreçlerinizi yönetmeye başlayın.', 'Start managing your customer conversations with FlowAsistan.')}
                 </p>
             </div>
 
@@ -77,14 +80,14 @@ export default function Register() {
                     <form onSubmit={handleRegister} className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none" htmlFor="fullName">
-                                Ad Soyad
+                                {t('Ad Soyad', 'Full Name')}
                             </label>
                             <div className="relative">
                                 <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                                 <input
                                     id="fullName"
                                     type="text"
-                                    placeholder="Adınız Soyadınız"
+                                    placeholder={t('Adınız Soyadınız', 'Your full name')}
                                     className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm pl-9 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
                                     value={formData.fullName}
                                     onChange={handleChange}
@@ -95,7 +98,7 @@ export default function Register() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none" htmlFor="email">
-                                E-posta Adresi
+                                {t('E-posta Adresi', 'Email Address')}
                             </label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -113,7 +116,7 @@ export default function Register() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none" htmlFor="password">
-                                Şifre
+                                {t('Şifre', 'Password')}
                             </label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -134,18 +137,18 @@ export default function Register() {
                             {loading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Kayıt Yapılıyor...
+                                    {t('Kayıt Yapılıyor...', 'Creating account...')}
                                 </>
                             ) : (
-                                'Kayıt Ol'
+                                t('Kayıt Ol', 'Sign Up')
                             )}
                         </Button>
                     </form>
 
                     <div className="mt-6 text-center text-sm">
-                        <span className="text-gray-500">Zaten hesabınız var mı?</span>{' '}
+                        <span className="text-gray-500">{t('Zaten hesabınız var mı?', 'Already have an account?')}</span>{' '}
                         <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
-                            Giriş Yapın
+                            {t('Giriş Yapın', 'Sign in')}
                         </Link>
                     </div>
                 </CardContent>

@@ -16,6 +16,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import { useLang } from '../../lib/i18n';
 
 interface AppointmentType {
     id: string;
@@ -53,14 +54,25 @@ function getFirstDayOfMonth(year: number, month: number) {
     return day === 0 ? 6 : day - 1;
 }
 
-const MONTHS = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-];
+const MONTHS = {
+    tr: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'],
+    en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+};
 
-const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const DAYS = {
+    tr: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
+    en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+};
+const FULL_DAYS = {
+    tr: ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'],
+    en: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+};
 
 export default function Calendar() {
+    const { t, lang, locale } = useLang();
+    const months = MONTHS[lang];
+    const days = DAYS[lang];
+    const fullDays = FULL_DAYS[lang];
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [isLoading, setIsLoading] = useState(true);
@@ -116,10 +128,10 @@ export default function Calendar() {
             if (data) {
                 const mappedData: AppointmentType[] = data.map((item: any) => ({
                     id: item.id,
-                    title: item.treatment || item.notes || 'Randevu', // treatment represents the topic/type often
-                    clientName: item.customers ? `${item.customers.first_name || ''} ${item.customers.last_name || ''}`.trim() : (item.doctor_name || 'İsimsiz Müşteri'),
-                    clientPhone: item.customers?.phone || 'Bilinmiyor',
-                    type: item.treatment || 'Genel', // mapping treatment to type concept for now
+                    title: item.treatment || item.notes || t('Randevu', 'Appointment'), // treatment represents the topic/type often
+                    clientName: item.customers ? `${item.customers.first_name || ''} ${item.customers.last_name || ''}`.trim() : (item.doctor_name || t('İsimsiz Müşteri', 'Unnamed Customer')),
+                    clientPhone: item.customers?.phone || t('Bilinmiyor', 'Unknown'),
+                    type: item.treatment || t('Genel', 'General'), // mapping treatment to type concept for now
                     // Strip the timezone offset/Z so the browser parses the text literally as local time safely
                     date: item.appointment_date ? new Date((item.appointment_date as string).replace(/(Z|[+-]\d{2}:\d{2})$/, '')) : new Date(),
                     duration: 30, // DB doesn't have duration currently, default to 30
@@ -186,7 +198,7 @@ export default function Calendar() {
     };
 
     const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     };
 
     const handleCreateAppointment = async (e: React.FormEvent) => {
@@ -209,7 +221,7 @@ export default function Calendar() {
                 appointment_date: localIsoString,
                 treatment: formData.title || formData.type, // Map title to treatment
                 doctor_name: formData.clientName, // Store clientName in doctor_name temporarily since we don't have customer_id lookup here yet
-                notes: `Süre: ${formData.duration} Dk. Tel: ${formData.clientPhone}`,
+                notes: t(`Süre: ${formData.duration} dk. Tel: ${formData.clientPhone}`, `Duration: ${formData.duration} min. Phone: ${formData.clientPhone}`),
                 status: 'confirmed'
             };
 
@@ -224,8 +236,8 @@ export default function Calendar() {
                 // Optimistically add to UI, but real app should rely on DB relations
                 const newAppt: AppointmentType = {
                     id: data[0].id,
-                    title: formData.title || 'Yeni Randevu',
-                    clientName: formData.clientName || 'İsimsiz Müşteri',
+                    title: formData.title || t('Yeni Randevu', 'New Appointment'),
+                    clientName: formData.clientName || t('İsimsiz Müşteri', 'Unnamed Customer'),
                     clientPhone: formData.clientPhone,
                     type: formData.type,
                     date: apptDate,
@@ -248,7 +260,7 @@ export default function Calendar() {
     };
 
     const handleDeleteAppointment = async (id: string) => {
-        if (!window.confirm('Bu randevuyu iptal etmek (silmek) istediğinize emin misiniz?')) {
+        if (!window.confirm(t('Bu randevuyu iptal etmek (silmek) istediğinize emin misiniz?', 'Are you sure you want to cancel (delete) this appointment?'))) {
             return;
         }
 
@@ -263,7 +275,7 @@ export default function Calendar() {
 
             if (!data || data.length === 0) {
                 // If no rows were returned, Supabase didn't let us delete it (usually an RLS issue)
-                alert('Randevu silinemedi. Supabase yetki kısıtlaması (RLS) nedeniyle işlem reddedilmiş olabilir. Lütfen Supabase panelinden "appointments" tablosu için Delete (Silme) izni olup olmadığını kontrol edin.');
+                alert(t('Randevu silinemedi. Supabase yetki kısıtlaması (RLS) nedeniyle işlem reddedilmiş olabilir. Lütfen Supabase panelinden "appointments" tablosu için Delete (Silme) izni olup olmadığını kontrol edin.', 'The appointment could not be deleted. The request may have been rejected by a Supabase permission (RLS) rule. Please check the Delete policy of the "appointments" table.'));
                 return;
             }
 
@@ -272,7 +284,7 @@ export default function Calendar() {
             setSelectedAppointment(null);
         } catch (error) {
             console.error('Error deleting appointment:', error);
-            alert('Randevu silinirken bir hata uluştu.');
+            alert(t('Randevu silinirken bir hata oluştu.', 'Something went wrong while deleting the appointment.'));
         }
     };
 
@@ -289,9 +301,9 @@ export default function Calendar() {
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold bg-gradient-to-br from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                                Takvim
+                                {t('Takvim', 'Calendar')}
                             </h2>
-                            <p className="text-sm text-gray-500 font-medium mt-0.5">Toplantılar ve Etkinlikler</p>
+                            <p className="text-sm text-gray-500 font-medium mt-0.5">{t('Toplantılar ve Etkinlikler', 'Meetings and Events')}</p>
                         </div>
                     </div>
 
@@ -301,14 +313,14 @@ export default function Calendar() {
                             onClick={goToToday}
                             className="text-gray-600 font-medium border-gray-200 hover:bg-gray-50 hover:text-gray-900 shadow-sm"
                         >
-                            Bugün
+                            {t('Bugün', 'Today')}
                         </Button>
                         <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 shadow-inner">
                             <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
                                 <ChevronLeft className="h-4 w-4 text-gray-600" />
                             </Button>
                             <span className="w-32 text-center font-semibold text-gray-900 text-sm">
-                                {MONTHS[month]} {year}
+                                {months[month]} {year}
                             </span>
                             <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
                                 <ChevronRight className="h-4 w-4 text-gray-600" />
@@ -321,7 +333,7 @@ export default function Calendar() {
                 <div className="p-8 flex-1 flex flex-col">
                     {/* Days of Week */}
                     <div className="grid grid-cols-7 mb-4">
-                        {DAYS.map(day => (
+                        {days.map(day => (
                             <div key={day} className="text-center font-bold text-xs text-gray-400 uppercase tracking-wider">
                                 {day}
                             </div>
@@ -385,7 +397,7 @@ export default function Calendar() {
             </div>
 
             {/* Right Column: Interaction Details */}
-            <div className="w-full xl:w-96 flex flex-col gap-6">
+            <div className="w-full xl:w-96 flex flex-col gap-6 xl:overflow-y-auto xl:max-h-full custom-scrollbar">
 
                 {/* Action Card */}
                 <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-6 shadow-lg shadow-blue-500/20 text-white flex flex-col justify-between shrink-0 relative overflow-hidden">
@@ -394,32 +406,38 @@ export default function Calendar() {
                     <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-24 h-24 bg-indigo-400/20 rounded-full blur-xl pointer-events-none"></div>
 
                     <div className="relative z-10">
-                        <h3 className="font-semibold text-blue-100 text-sm mb-1">Hızlı İşlem</h3>
-                        <h2 className="text-xl font-bold mb-4">Yeni Toplantı Planla</h2>
+                        <h3 className="font-semibold text-blue-100 text-sm mb-1">{t('Hızlı İşlem', 'Quick Action')}</h3>
+                        <h2 className="text-xl font-bold mb-4">{t('Yeni Toplantı Planla', 'Schedule a New Meeting')}</h2>
                         <Button onClick={() => setIsModalOpen(true)} className="w-full bg-white text-blue-700 hover:bg-gray-50 shadow-md border-0 group">
                             <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
-                            Randevu Oluştur
+                            {t('Randevu Oluştur', 'Create Appointment')}
                         </Button>
                     </div>
                 </div>
 
                 {/* Daily Schedule Card */}
-                <div className="flex-1 min-h-[400px] xl:min-h-0 bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col overflow-hidden">
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col overflow-hidden min-h-[420px]">
                     <div className="p-6 border-b border-gray-100/60 flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900">
-                                {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
+                                {selectedDate.getDate()} {months[selectedDate.getMonth()]}
                             </h3>
                             <p className="text-sm font-medium text-gray-500">
-                                {DAYS[selectedDate.getDay() === 0 ? 6 : selectedDate.getDay() - 1]} Günü
+                                {fullDays[selectedDate.getDay() === 0 ? 6 : selectedDate.getDay() - 1]}
                             </p>
                         </div>
-                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 px-3 py-1 font-semibold rounded-lg">
-                            {selectedDayAppointments.length} Etkinlik
-                        </Badge>
+                        {selectedDayAppointments.length > 0 ? (
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 px-3 py-1.5 font-bold rounded-xl text-sm">
+                                {selectedDayAppointments.length} {t('Randevu', selectedDayAppointments.length === 1 ? 'appointment' : 'appointments')}
+                            </Badge>
+                        ) : (
+                            <Badge variant="secondary" className="bg-gray-50 text-gray-400 px-3 py-1.5 font-medium rounded-xl text-sm">
+                                {t('Boş Gün', 'Free Day')}
+                            </Badge>
+                        )}
                     </div>
 
-                    <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-4">
+                    <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                         <AnimatePresence mode="popLayout">
                             {selectedDayAppointments.length > 0 ? (
                                 selectedDayAppointments.map((app, index) => (
@@ -471,7 +489,7 @@ export default function Calendar() {
                                                     {app.type === 'video' && <Video className="h-3 w-3" />}
                                                     {app.type === 'call' && <Phone className="h-3 w-3" />}
                                                     {app.type === 'in-person' && <MapPin className="h-3 w-3" />}
-                                                    {app.type === 'video' ? 'Video Konferans' : app.type === 'call' ? 'Telefon Görüşmesi' : 'Yüzyüze'}
+                                                    {app.type === 'video' ? t('Video Konferans', 'Video Call') : app.type === 'call' ? t('Telefon Görüşmesi', 'Phone Call') : t('Yüzyüze', 'In Person')}
                                                 </Badge>
                                             </div>
                                         </div>
@@ -481,13 +499,13 @@ export default function Calendar() {
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    className="h-full flex flex-col items-center justify-center text-center px-4"
+                                    className="py-10 flex flex-col items-center justify-center text-center px-4"
                                 >
                                     <div className="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center mb-4 border border-gray-100">
                                         <CalendarIcon className="h-8 w-8 text-gray-300" />
                                     </div>
-                                    <p className="text-gray-500 font-medium">Bu tarihte planlı bir etkinlik yok.</p>
-                                    <p className="text-sm text-gray-400 mt-1">Gününüzü planlamak için yeni bir randevu oluşturun.</p>
+                                    <p className="text-gray-500 font-medium">{t('Bu tarihte planlı bir etkinlik yok.', 'Nothing is scheduled for this date.')}</p>
+                                    <p className="text-sm text-gray-400 mt-1">{t('Gününüzü planlamak için yeni bir randevu oluşturun.', 'Create a new appointment to plan your day.')}</p>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -497,8 +515,8 @@ export default function Calendar() {
                 {/* Recently Added Card */}
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col overflow-hidden shrink-0">
                     <div className="p-6 border-b border-gray-100/60 pb-4">
-                        <h3 className="text-lg font-bold text-gray-900">Son Eklenenler</h3>
-                        <p className="text-sm font-medium text-gray-500">Sisteme yeni girilen randevular</p>
+                        <h3 className="text-lg font-bold text-gray-900">{t('Son Eklenenler', 'Recently Added')}</h3>
+                        <p className="text-sm font-medium text-gray-500">{t('Sisteme yeni girilen randevular', 'Appointments recently added to the system')}</p>
                     </div>
                     <div className="p-4 flex flex-col gap-3">
                         {recentAppointments.length > 0 ? (
@@ -514,7 +532,7 @@ export default function Calendar() {
                                         <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                                             <span className="truncate">{app.title}</span>
                                             <span>•</span>
-                                            <span className="shrink-0">{app.date.toLocaleDateString('tr-TR')} {formatTime(app.date)}</span>
+                                            <span className="shrink-0">{app.date.toLocaleDateString(locale)} {formatTime(app.date)}</span>
                                         </div>
                                     </div>
                                     <div className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg shrink-0">
@@ -524,7 +542,7 @@ export default function Calendar() {
                             ))
                         ) : (
                             <div className="py-4 text-center text-sm text-gray-500">
-                                Henüz randevu bulunmuyor.
+                                {isLoading ? t('Yükleniyor...', 'Loading...') : t('Henüz randevu bulunmuyor.', 'No appointments yet.')}
                             </div>
                         )}
                     </div>
@@ -550,7 +568,7 @@ export default function Calendar() {
                             className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 overflow-hidden"
                         >
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-gray-900">Randevu Oluştur</h3>
+                                <h3 className="text-xl font-bold text-gray-900">{t('Randevu Oluştur', 'Create Appointment')}</h3>
                                 <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="h-8 w-8 text-gray-500 rounded-full hover:bg-gray-100">
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -558,20 +576,20 @@ export default function Calendar() {
 
                             <form onSubmit={handleCreateAppointment} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Toplantı Konusu</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('Toplantı Konusu', 'Subject')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={formData.title}
                                         onChange={e => setFormData({ ...formData, title: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                                        placeholder="Örn: Ürün Demosu"
+                                        placeholder={t('Örn: Ürün Demosu', 'e.g. Product demo')}
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Müşteri Adı</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Müşteri Adı', 'Customer Name')}</label>
                                         <input
                                             type="text"
                                             required
@@ -581,7 +599,7 @@ export default function Calendar() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefon Numarası</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Telefon Numarası', 'Phone Number')}</label>
                                         <input
                                             type="tel"
                                             value={formData.clientPhone}
@@ -594,13 +612,13 @@ export default function Calendar() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Tarih</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Tarih', 'Date')}</label>
                                         <div className="w-full px-3 py-2 border border-gray-100 bg-gray-50 rounded-xl text-gray-600 cursor-not-allowed">
-                                            {selectedDate.toLocaleDateString('tr-TR')}
+                                            {selectedDate.toLocaleDateString(locale)}
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Saat</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Saat', 'Time')}</label>
                                         <input
                                             type="time"
                                             required
@@ -613,38 +631,38 @@ export default function Calendar() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Tür</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Tür', 'Type')}</label>
                                         <select
                                             value={formData.type}
                                             onChange={e => setFormData({ ...formData, type: e.target.value })}
                                             className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors bg-white"
                                         >
-                                            <option value="video">Video Konferans</option>
-                                            <option value="call">Telefon Görüşmesi</option>
-                                            <option value="in-person">Yüzyüze</option>
+                                            <option value="video">{t('Video Konferans', 'Video Call')}</option>
+                                            <option value="call">{t('Telefon Görüşmesi', 'Phone Call')}</option>
+                                            <option value="in-person">{t('Yüzyüze', 'In Person')}</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Süre (Dk)</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Süre (Dk)', 'Duration (min)')}</label>
                                         <select
                                             value={formData.duration}
                                             onChange={e => setFormData({ ...formData, duration: Number(e.target.value) })}
                                             className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors bg-white"
                                         >
-                                            <option value={15}>15 Dakika</option>
-                                            <option value={30}>30 Dakika</option>
-                                            <option value={45}>45 Dakika</option>
-                                            <option value={60}>1 Saat</option>
-                                            <option value={90}>1.5 Saat</option>
-                                            <option value={120}>2 Saat</option>
-                                            <option value={180}>3 Saat</option>
+                                            <option value={15}>{t('15 Dakika', '15 minutes')}</option>
+                                            <option value={30}>{t('30 Dakika', '30 minutes')}</option>
+                                            <option value={45}>{t('45 Dakika', '45 minutes')}</option>
+                                            <option value={60}>{t('1 Saat', '1 hour')}</option>
+                                            <option value={90}>{t('1.5 Saat', '1.5 hours')}</option>
+                                            <option value={120}>{t('2 Saat', '2 hours')}</option>
+                                            <option value={180}>{t('3 Saat', '3 hours')}</option>
                                         </select>
                                     </div>
                                 </div>
 
                                 <div className="pt-4 flex justify-end gap-3">
-                                    <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}> İptal </Button>
-                                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"> Kaydet </Button>
+                                    <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}> {t('İptal', 'Cancel')} </Button>
+                                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"> {t('Kaydet', 'Save')} </Button>
                                 </div>
                             </form>
                         </motion.div>
@@ -693,9 +711,9 @@ export default function Calendar() {
                                             <Clock className="h-5 w-5" />
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 font-medium">Tarih & Saat</p>
+                                            <p className="text-xs text-gray-500 font-medium">{t('Tarih & Saat', 'Date & Time')}</p>
                                             <p className="font-semibold text-gray-900 text-sm">
-                                                {selectedAppointment.date.toLocaleDateString('tr-TR')} • {formatTime(selectedAppointment.date)}
+                                                {selectedAppointment.date.toLocaleDateString(locale)} • {formatTime(selectedAppointment.date)}
                                             </p>
                                         </div>
                                     </div>
@@ -705,9 +723,9 @@ export default function Calendar() {
                                             {selectedAppointment.type === 'video' ? <Video className="h-5 w-5" /> : selectedAppointment.type === 'call' ? <Phone className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 font-medium">Görüşme Tipi</p>
+                                            <p className="text-xs text-gray-500 font-medium">{t('Görüşme Tipi', 'Meeting Type')}</p>
                                             <p className="font-semibold text-gray-900 text-sm">
-                                                {selectedAppointment.type === 'video' ? 'Video Konferans' : selectedAppointment.type === 'call' ? 'Telefon Görüşmesi' : 'Yüzyüze'}
+                                                {selectedAppointment.type === 'video' ? t('Video Konferans', 'Video Call') : selectedAppointment.type === 'call' ? t('Telefon Görüşmesi', 'Phone Call') : t('Yüzyüze', 'In Person')}
                                             </p>
                                         </div>
                                     </div>
@@ -717,14 +735,14 @@ export default function Calendar() {
                                             <Phone className="h-5 w-5" />
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 font-medium">İletişim</p>
+                                            <p className="text-xs text-gray-500 font-medium">{t('İletişim', 'Contact')}</p>
                                             <p className="font-semibold text-gray-900 text-sm">{selectedAppointment.clientPhone}</p>
                                         </div>
                                     </div>
                                     
                                     {selectedAppointment.notes && (
                                         <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                                            <p className="text-xs text-gray-500 font-medium mb-1">Notlar / Detaylar</p>
+                                            <p className="text-xs text-gray-500 font-medium mb-1">{t('Notlar / Detaylar', 'Notes / Details')}</p>
                                             <p className="text-sm text-gray-700 leading-relaxed">{selectedAppointment.notes}</p>
                                         </div>
                                     )}
@@ -732,14 +750,14 @@ export default function Calendar() {
                                 
                                 <div className="mt-8 flex gap-3">
                                     <Button onClick={() => setSelectedAppointment(null)} className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-xl">
-                                        Kapat
+                                        {t('Kapat', 'Close')}
                                     </Button>
                                     <Button 
                                         variant="outline" 
                                         onClick={() => handleDeleteAppointment(selectedAppointment.id)}
                                         className="w-full rounded-xl border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                                     >
-                                        İptal Et
+                                        {t('İptal Et', 'Cancel Appointment')}
                                     </Button>
                                 </div>
                             </div>

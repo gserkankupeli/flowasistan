@@ -20,14 +20,13 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Check } from 'lucide-react';
+import { useLang } from '../../lib/i18n';
+import { dayKey, lastDays, statusLabel, timeAgo } from '../../lib/format';
 
-// Extend the database types for specific joins if needed, 
-// or use the generic structure but cast properly.
-// For interactions view:
 interface Interaction {
     id: string;
     summary: string | null;
-    platform: string; // 'whatsapp' | 'web' | 'instagram' | 'phone' in DB it might be platform_type
+    platform_type: string | null;
     status: string;
     last_message_at: string;
     customers: {
@@ -60,7 +59,14 @@ interface DashboardStats {
     urgentActions: number;
 }
 
+interface ChartPoint {
+    name: string;
+    chatbot: number;
+    voice: number;
+}
+
 export default function Overview() {
+    const { t, locale } = useLang();
     const [stats, setStats] = useState<DashboardStats>({
         totalInteractions: 0,
         activeSessions: 0,
@@ -68,19 +74,8 @@ export default function Overview() {
     });
     const [recentActivity, setRecentActivity] = useState<Interaction[]>([]);
     const [urgentCallbacks, setUrgentCallbacks] = useState<UrgentCallback[]>([]);
+    const [chartData, setChartData] = useState<ChartPoint[]>([]);
     const [loading, setLoading] = useState(true);
-
-    // Mock chart data for now (since aggregate queries for charts are complex/better done with RPC or separate logic)
-    // You can implement real chart data fetching later similarly.
-    const chartData = [
-        { name: '09:00', chatbot: 40, voice: 24 },
-        { name: '11:00', chatbot: 30, voice: 13 },
-        { name: '13:00', chatbot: 20, voice: 58 },
-        { name: '15:00', chatbot: 27, voice: 39 },
-        { name: '17:00', chatbot: 18, voice: 48 },
-        { name: '19:00', chatbot: 23, voice: 38 },
-        { name: '21:00', chatbot: 34, voice: 43 },
-    ];
 
     useEffect(() => {
         fetchDashboardData();
@@ -121,31 +116,22 @@ export default function Overview() {
         setLoading(true);
         try {
             // 1. Fetch KPI Counts
-            // Total Conversations
             const { count: totalCount } = await supabase
                 .from('chatbot_conversations')
                 .select('*', { count: 'exact', head: true });
 
-            // Active Sessions
             const { count: activeCount } = await supabase
                 .from('chatbot_conversations')
                 .select('*', { count: 'exact', head: true })
-                .eq('status', 'active'); // Assuming 'active' is a valid status enum
+                .eq('status', 'active');
 
-            // Urgent Actions (e.g. specific category or sentiment. 
-            // Assuming we check 'category_id' referring to an "Urgent" category OR checking null summary/errors.
-            // For now, let's assume we want to count rows where category might join to "Acil" or similar.
-            // But simpler: let's count where status is 'human_handoff' or something critical, or just mock logic for "Urgent" count if DB doesn't have it explicitly.)
-            // Let's rely on 'categories' table if possible. For simplicity here: status = 'closed' as "Completed", active as "Waiting".
-            // Let's count 'active' as Urgent for this demo if separate critical field missing.
-
-            // Let's fetch recent Activity with Relations
+            // 2. Recent activity with relations
             const { data: activityData, error: activityError } = await supabase
                 .from('chatbot_conversations')
                 .select(`
           id,
           summary,
-          platform: platform_type,
+          platform_type,
           status,
           last_message_at,
           customers ( first_name, last_name, phone ),
@@ -156,18 +142,7 @@ export default function Overview() {
 
             if (activityError) throw activityError;
 
-            // Transform raw data to UI shape if needed
-            const formattedActivity = (activityData as any[]).map(item => ({
-                id: item.id,
-                summary: item.summary,
-                platform: item.platform,
-                status: item.status,
-                last_message_at: item.last_message_at,
-                customers: item.customers, // might be array or object depending on relation one-to-one/many
-                categories: item.categories
-            }));
-
-            // Fetch Urgent Callbacks
+            // 3. Urgent callbacks
             const { data: urgentData, error: urgentError } = await supabase
                 .from('urgent_callbacks')
                 .select('*')
@@ -175,12 +150,40 @@ export default function Overview() {
 
             if (urgentError) console.error('Error fetching urgent callbacks:', urgentError);
 
+            // 4. Last 7 days, chatbot vs. voice
+            const since = lastDays(7)[0].toISOString();
+            const { data: chatDates } = await supabase
+                .from('chatbot_conversations')
+                .select('last_message_at')
+                .gte('last_message_at', since);
+            const { data: callDates } = await supabase
+                .from('call_analytics')
+                .select('created_at')
+                .gte('created_at', since);
+
+            const countByDay = (dates: (string | null)[]) => {
+                const counts: Record<string, number> = {};
+                dates.forEach(d => {
+                    if (!d) return;
+                    const key = dayKey(new Date(d));
+                    counts[key] = (counts[key] || 0) + 1;
+                });
+                return counts;
+            };
+            const chatByDay = countByDay((chatDates || []).map((r: any) => r.last_message_at));
+            const voiceByDay = countByDay((callDates || []).map((r: any) => r.created_at));
+
+            setChartData(lastDays(7).map(day => ({
+                name: day.toLocaleDateString(locale, { weekday: 'short' }),
+                chatbot: chatByDay[dayKey(day)] || 0,
+                voice: voiceByDay[dayKey(day)] || 0,
+            })));
             setStats({
                 totalInteractions: totalCount || 0,
                 activeSessions: activeCount || 0,
                 urgentActions: urgentData?.length || 0
             });
-            setRecentActivity(formattedActivity);
+            setRecentActivity((activityData || []) as unknown as Interaction[]);
             if (urgentData) setUrgentCallbacks(urgentData as UrgentCallback[]);
 
         } catch (err) {
@@ -190,24 +193,13 @@ export default function Overview() {
         }
     };
 
-    const getPlatformIcon = (platform: string) => {
+    const getPlatformIcon = (platform: string | null) => {
         switch (platform?.toLowerCase()) {
             case 'whatsapp': return <MessageSquare className="h-4 w-4 text-green-600" />;
             case 'voice': return <Phone className="h-4 w-4 text-purple-600" />;
             case 'instagram': return <MessageSquare className="h-4 w-4 text-pink-600" />;
             default: return <MessageSquare className="h-4 w-4 text-blue-600" />;
         }
-    };
-
-    const getTimeAgo = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-        if (diffInSeconds < 60) return 'Az önce';
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}dk önce`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}sa önce`;
-        return `${Math.floor(diffInSeconds / 86400)}g önce`;
     };
 
     const markAsCompleted = async (conversationId: string) => {
@@ -221,7 +213,7 @@ export default function Overview() {
             fetchDashboardData();
         } catch (error) {
             console.error("Error marking as completed", error);
-            alert("İşlem tamamlanırken bir hata oluştu.");
+            alert(t("İşlem tamamlanırken bir hata oluştu.", "Something went wrong while completing the action."));
         }
     };
 
@@ -229,46 +221,46 @@ export default function Overview() {
         <div className="space-y-8">
             {/* Header */}
             <div className="mb-6">
-                <h2 className="text-[28px] font-bold tracking-tight text-gray-900">Genel Bakış</h2>
-                <p className="text-[15px] text-gray-400 mt-1 font-medium">Chatbot ve sesli asistan performansınızı buradan takip edin.</p>
+                <h2 className="text-[28px] font-bold tracking-tight text-gray-900">{t('Genel Bakış', 'Overview')}</h2>
+                <p className="text-[15px] text-gray-400 mt-1 font-medium">{t('Chatbot ve sesli asistan performansınızı buradan takip edin.', 'Track your chatbot and voice agent performance here.')}</p>
             </div>
 
             {/* KPI Cards */}
             <div className="grid gap-6 md:grid-cols-3">
                 <Card hoverEffect>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
-                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">Toplam Etkileşim</CardTitle>
+                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">{t('Toplam Etkileşim', 'Total Conversations')}</CardTitle>
                         <MessageSquare className="h-[18px] w-[18px] text-blue-400" />
                     </CardHeader>
                     <CardContent className="bg-transparent">
                         <div className="text-[42px] font-extrabold text-gray-900 tracking-tight leading-none mb-2">{stats.totalInteractions}</div>
                         <p className="text-[13px] text-emerald-500 flex items-center font-bold">
                             <ArrowUpRight className="h-4 w-4 mr-1" />
-                            Güncel
+                            {t('Güncel', 'Up to date')}
                         </p>
                     </CardContent>
                 </Card>
                 <Card hoverEffect>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
-                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">Aktif Görüşmeler</CardTitle>
+                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">{t('Aktif Görüşmeler', 'Active Conversations')}</CardTitle>
                         <Clock className="h-[18px] w-[18px] text-orange-400" />
                     </CardHeader>
                     <CardContent className="bg-transparent">
                         <div className="text-[42px] font-extrabold text-gray-900 tracking-tight leading-none mb-2">{stats.activeSessions}</div>
                         <p className="text-[13px] text-orange-500 flex items-center font-bold">
-                            Canlı devam eden
+                            {t('Canlı devam eden', 'Currently open')}
                         </p>
                     </CardContent>
                 </Card>
                 <Card hoverEffect>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
-                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">Aksiyon Bekleyen</CardTitle>
+                        <CardTitle className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">{t('Aksiyon Bekleyen', 'Needs Action')}</CardTitle>
                         <AlertCircle className="h-[18px] w-[18px] text-red-400" />
                     </CardHeader>
                     <CardContent className="bg-transparent">
                         <div className="text-[42px] font-extrabold text-gray-900 tracking-tight leading-none mb-2">{stats.urgentActions}</div>
                         <p className="text-[13px] text-red-500 flex items-center font-bold">
-                            Müdahale gerekli
+                            {t('Müdahale gerekli', 'Human follow-up required')}
                         </p>
                     </CardContent>
                 </Card>
@@ -285,15 +277,15 @@ export default function Overview() {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                             </span>
-                            Son Etkileşimler (Canlı)
+                            {t('Son Etkileşimler (Canlı)', 'Latest Conversations (Live)')}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="overflow-y-auto pr-4 custom-scrollbar" style={{ height: '400px' }}>
                         <div className="space-y-5">
-                            {loading ? (
-                                <div className="text-center py-10 text-gray-400 font-medium">Yükleniyor...</div>
+                            {loading && recentActivity.length === 0 ? (
+                                <div className="text-center py-10 text-gray-400 font-medium">{t('Yükleniyor...', 'Loading...')}</div>
                             ) : recentActivity.length === 0 ? (
-                                <div className="text-center py-10 text-gray-400 font-medium">Henüz etkileşim yok.</div>
+                                <div className="text-center py-10 text-gray-400 font-medium">{t('Henüz etkileşim yok.', 'No conversations yet.')}</div>
                             ) : (
                                 recentActivity.map((item) => (
                                     <motion.div
@@ -303,17 +295,17 @@ export default function Overview() {
                                         className="flex gap-4 p-4 rounded-2xl hover:bg-[#f8fafc] transition-colors border border-transparent hover:border-gray-100 group"
                                     >
                                         <div className="h-11 w-11 rounded-2xl bg-blue-50/50 flex items-center justify-center shrink-0 border border-blue-100/50">
-                                            {getPlatformIcon(item.platform)}
+                                            {getPlatformIcon(item.platform_type)}
                                         </div>
                                         <div className="flex-1 min-w-0 pt-0.5">
                                             <div className="flex items-center justify-between mb-1.5">
                                                 <p className="text-[15px] font-bold text-gray-900 truncate">
                                                     {item.customers?.first_name} {item.customers?.last_name}
                                                 </p>
-                                                <span className="text-[13px] font-medium text-gray-400 whitespace-nowrap">{getTimeAgo(item.last_message_at)}</span>
+                                                <span className="text-[13px] font-medium text-gray-400 whitespace-nowrap">{timeAgo(item.last_message_at, t)}</span>
                                             </div>
                                             <p className="text-[14px] leading-relaxed text-gray-500 line-clamp-2">
-                                                {item.summary || 'Özet bekleniyor...'}
+                                                {item.summary || t('Özet bekleniyor...', 'Summary pending...')}
                                             </p>
                                             <div className="flex items-center gap-2 mt-3">
                                                 <span
@@ -323,11 +315,11 @@ export default function Overview() {
                                                         color: item.categories?.color || '#94a3b8'
                                                     }}
                                                 >
-                                                    {item.categories?.name || 'Kategorisiz'}
+                                                    {item.categories?.name || t('Kategorisiz', 'Uncategorized')}
                                                 </span>
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase font-bold tracking-wider ${item.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'
                                                     }`}>
-                                                    {item.status}
+                                                    {statusLabel(item.status, t)}
                                                 </span>
                                             </div>
                                         </div>
@@ -340,11 +332,16 @@ export default function Overview() {
 
                 {/* Chart Section */}
                 <Card className="md:col-span-3 h-[500px]" hoverEffect>
-                    <CardHeader className="pb-8">
-                        <CardTitle className="text-lg font-bold text-gray-900">Etkileşim Yoğunluğu</CardTitle>
+                    <CardHeader className="pb-6">
+                        <CardTitle className="text-lg font-bold text-gray-900">{t('Etkileşim Yoğunluğu', 'Conversation Volume')}</CardTitle>
+                        <div className="flex items-center gap-4 pt-2 text-[12px] font-semibold text-gray-500">
+                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#60a5fa]" />Chatbot</span>
+                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#c084fc]" />{t('Sesli Asistan', 'Voice Agent')}</span>
+                            <span className="ml-auto font-medium text-gray-400">{t('Son 7 gün', 'Last 7 days')}</span>
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[360px] w-full">
+                        <div className="h-[350px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                                     <defs>
@@ -358,12 +355,13 @@ export default function Overview() {
                                         </linearGradient>
                                     </defs>
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} tickMargin={15} className="text-[12px] font-medium text-gray-400" />
-                                    <YAxis axisLine={false} tickLine={false} tickMargin={15} className="text-[12px] font-medium text-gray-400" />
+                                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} tickMargin={15} className="text-[12px] font-medium text-gray-400" />
                                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontWeight: 'bold' }} />
                                     <Area
                                         type="monotone"
                                         dataKey="chatbot"
+                                        name="Chatbot"
                                         stroke="#60a5fa"
                                         strokeWidth={3}
                                         fillOpacity={1}
@@ -372,6 +370,7 @@ export default function Overview() {
                                     <Area
                                         type="monotone"
                                         dataKey="voice"
+                                        name={t('Sesli Asistan', 'Voice Agent')}
                                         stroke="#c084fc"
                                         strokeWidth={3}
                                         fillOpacity={1}
@@ -391,21 +390,21 @@ export default function Overview() {
                     <CardHeader className="pb-4 border-b border-gray-100 flex flex-row items-center justify-between bg-red-50/30">
                         <CardTitle className="flex items-center gap-2 text-lg font-bold text-red-900">
                             <AlertCircle className="h-5 w-5 text-red-500" />
-                            Acil Aksiyon / Geri Arama Bekleyen Müşteriler
+                            {t('Acil Aksiyon / Geri Arama Bekleyen Müşteriler', 'Customers Waiting for Action / Callback')}
                         </CardTitle>
-                        <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">{urgentCallbacks.length} Kişi Bekliyor</span>
+                        <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap">{urgentCallbacks.length} {t('Kişi Bekliyor', 'waiting')}</span>
                     </CardHeader>
                     <CardContent className="p-0">
-                        {loading ? (
-                            <div className="text-center py-10 text-gray-400 font-medium">Yükleniyor...</div>
+                        {loading && urgentCallbacks.length === 0 ? (
+                            <div className="text-center py-10 text-gray-400 font-medium">{t('Yükleniyor...', 'Loading...')}</div>
                         ) : urgentCallbacks.length === 0 ? (
-                            <div className="text-center py-10 text-gray-400 font-medium bg-gray-50/50">Şu anda acil aksiyon bekleyen müşteri yok. Harika iş!</div>
+                            <div className="text-center py-10 text-gray-400 font-medium bg-gray-50/50">{t('Şu anda acil aksiyon bekleyen müşteri yok. Harika iş!', 'Nobody is waiting for action right now. Great work!')}</div>
                         ) : (
                             <div className="divide-y divide-gray-100">
                                 {urgentCallbacks.map((cb) => (
-                                    <div key={cb.conversation_id} className="p-5 hover:bg-gray-50/80 transition-colors flex items-center justify-between group">
+                                    <div key={cb.conversation_id} className="p-5 hover:bg-gray-50/80 transition-colors flex flex-col gap-3 md:flex-row md:items-center md:justify-between group">
                                         <div className="flex-1 min-w-0 pr-4">
-                                            <div className="flex items-center gap-3 mb-1">
+                                            <div className="flex flex-wrap items-center gap-3 mb-1">
                                                 <h4 className="text-[15px] font-bold text-gray-900">
                                                     {cb.first_name} {cb.last_name}
                                                 </h4>
@@ -416,25 +415,25 @@ export default function Overview() {
                                                     {cb.durum}
                                                 </span>
                                                 <span className="text-xs font-medium text-gray-400">
-                                                    {cb.son_mesaj_tarihi ? new Date(cb.son_mesaj_tarihi).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    {cb.son_mesaj_tarihi ? new Date(cb.son_mesaj_tarihi).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-4 text-[13px] text-gray-500 mb-2">
-                                                <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> {cb.phone || 'Telefon yok'}</span>
+                                                <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> {cb.phone || t('Telefon yok', 'No phone')}</span>
                                             </div>
-                                            <p className="text-sm text-gray-600 line-clamp-1 bg-white inline-block border border-gray-100 px-3 py-1.5 rounded-lg">
-                                                <span className="text-gray-400 font-medium mr-1 border-r border-gray-200 pr-2">Özet:</span>
-                                                {cb.konusma_ozeti || 'Özet bekleniyor...'}
+                                            <p className="text-sm text-gray-600 line-clamp-2 bg-white inline-block border border-gray-100 px-3 py-1.5 rounded-lg">
+                                                <span className="text-gray-400 font-medium mr-1 border-r border-gray-200 pr-2">{t('Özet:', 'Summary:')}</span>
+                                                {cb.konusma_ozeti || t('Özet bekleniyor...', 'Summary pending...')}
                                             </p>
                                         </div>
-                                        <div className="flex-shrink-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex-shrink-0 flex items-center gap-2">
                                             <Button
                                                 onClick={() => markAsCompleted(cb.conversation_id)}
                                                 className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-none shadow-none font-bold"
                                                 size="sm"
                                             >
                                                 <Check className="h-4 w-4 mr-1.5" />
-                                                Çözüldü Olarak İşaretle
+                                                {t('Çözüldü Olarak İşaretle', 'Mark as Resolved')}
                                             </Button>
                                         </div>
                                     </div>

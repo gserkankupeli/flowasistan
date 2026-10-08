@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { isDemo } from '../lib/config';
 
 interface AuthContextType {
     session: Session | null;
@@ -11,12 +12,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Demo mode has no accounts: the panel opens directly as this fixed visitor profile.
+const demoUser = {
+    id: 'demo-user',
+    email: 'demo@flowixy.com',
+    user_metadata: { full_name: 'Demo' },
+} as unknown as User;
+const demoSession = { user: demoUser } as unknown as Session;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [session, setSession] = useState<Session | null>(null);
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [session, setSession] = useState<Session | null>(isDemo ? demoSession : null);
+    const [user, setUser] = useState<User | null>(isDemo ? demoUser : null);
+    const [loading, setLoading] = useState(!isDemo);
 
     useEffect(() => {
+        if (isDemo) return;
+
         // Initial session check
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -35,6 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signOut = async () => {
+        if (isDemo) {
+            window.location.assign('/');
+            return;
+        }
         await supabase.auth.signOut();
     };
 

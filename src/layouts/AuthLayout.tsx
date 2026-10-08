@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { LanguageToggle, useLang } from '../lib/i18n';
 
 export default function AuthLayout() {
+    const { t } = useLang();
     return (
         <div className="flex min-h-screen bg-gray-50">
             {/* Left Side - Brand & Info */}
@@ -25,7 +27,7 @@ export default function AuthLayout() {
                             transition={{ delay: 0.2 }}
                             className="text-4xl font-bold leading-tight"
                         >
-                            Müşteri etkileşimlerinizi yapay zeka ile yönetin.
+                            {t('Müşteri etkileşimlerinizi yapay zeka ile yönetin.', 'Manage your customer conversations with AI.')}
                         </motion.h1>
                         <motion.p
                             initial={{ opacity: 0, y: 20 }}
@@ -33,7 +35,7 @@ export default function AuthLayout() {
                             transition={{ delay: 0.4 }}
                             className="text-lg text-blue-100"
                         >
-                            Chatbot ve sesli asistan görüşmelerinizi tek bir panelden yönetin, analiz edin ve müşteri memnuniyetini artırın.
+                            {t('Chatbot ve sesli asistan görüşmelerinizi tek bir panelden yönetin, analiz edin ve müşteri memnuniyetini artırın.', 'Manage and analyze your chatbot and voice agent conversations from a single panel, and raise customer satisfaction.')}
                         </motion.p>
                     </div>
 
@@ -46,7 +48,8 @@ export default function AuthLayout() {
             </div>
 
             {/* Right Side - Form */}
-            <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24">
+            <div className="relative flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24">
+                <div className="absolute right-4 top-4"><LanguageToggle /></div>
                 <div className="mx-auto w-full max-w-sm lg:w-96">
                     <Outlet />
                 </div>

@@ -5,9 +5,12 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader } from '../../components/ui/card';
 import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { APP_BASE } from '../../lib/config';
+import { useLang } from '../../lib/i18n';
 
 export default function Login() {
     const navigate = useNavigate();
+    const { t } = useLang();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [email, setEmail] = useState('');
@@ -24,11 +27,11 @@ export default function Login() {
         });
 
         if (error) {
-            setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+            setError(t('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.', 'Sign-in failed. Please check your credentials.'));
             setLoading(false);
         } else {
             // Successful login
-            navigate('/');
+            navigate(APP_BASE);
         }
     };
 
@@ -40,10 +43,10 @@ export default function Login() {
         >
             <div className="text-center lg:text-left">
                 <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Tekrar Hoşgeldiniz
+                    {t('Tekrar Hoşgeldiniz', 'Welcome Back')}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                    Hesabınıza giriş yaparak panelinizi yönetin.
+                    {t('Hesabınıza giriş yaparak panelinizi yönetin.', 'Sign in to manage your panel.')}
                 </p>
             </div>
 
@@ -60,7 +63,7 @@ export default function Login() {
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-                                E-posta Adresi
+                                {t('E-posta Adresi', 'Email Address')}
                             </label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -78,10 +81,10 @@ export default function Login() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
-                                    Şifre
+                                    {t('Şifre', 'Password')}
                                 </label>
                                 <Link to="/auth/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
-                                    Şifremi Unuttum?
+                                    {t('Şifremi Unuttum?', 'Forgot password?')}
                                 </Link>
                             </div>
                             <div className="relative">
@@ -101,18 +104,18 @@ export default function Login() {
                             {loading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Giriş Yapılıyor...
+                                    {t('Giriş Yapılıyor...', 'Signing in...')}
                                 </>
                             ) : (
-                                'Giriş Yap'
+                                t('Giriş Yap', 'Sign In')
                             )}
                         </Button>
                     </form>
 
                     <div className="mt-6 text-center text-sm">
-                        <span className="text-gray-500">Hesabınız yok mu?</span>{' '}
+                        <span className="text-gray-500">{t('Hesabınız yok mu?', 'No account yet?')}</span>{' '}
                         <Link to="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
-                            Hemen Kayıt Olun
+                            {t('Hemen Kayıt Olun', 'Sign up now')}
                         </Link>
                     </div>
                 </CardContent>
