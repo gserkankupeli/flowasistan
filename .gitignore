@@ -31,3 +31,5 @@ dist-ssr
 
 # dual-danis consult records (kept local)
 .dual-danis/
+
+.vercel
